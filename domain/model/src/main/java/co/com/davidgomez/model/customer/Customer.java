@@ -17,5 +17,5 @@ public class Customer {
     private final String phone;
 
     private final Source source;
-    private final LocalDateTime dateTimesTamp;
+    private final LocalDateTime dataTimestamp;
 }
