@@ -21,12 +21,12 @@ public class RawCustomerRecord {
     private final String name;
     private final String email;
     private final String phone;
-    private final LocalDateTime dataTimesTamp;
+    private final LocalDateTime dataTimestamp;
 
     private final RecordStatus status;
 
     private final String hash;
 
-    private final String error;
+    private final String errorMessage;
 
 }
