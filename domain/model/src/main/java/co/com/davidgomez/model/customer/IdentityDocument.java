@@ -11,7 +11,7 @@ public record IdentityDocument(String type, String number) {
         String type = rawType.trim().toUpperCase();
 
         String number = rawNumber
-                .replaceAll("[^1-9A-Za-z]","")
+                .replaceAll("[^0-9A-Za-z]","")
                 .toUpperCase()
                 .replaceFirst("^0+(?!$)","");
 
@@ -19,7 +19,7 @@ public record IdentityDocument(String type, String number) {
             throw new IllegalArgumentException("Numero de documento invalido");
         }
 
-        return new IdentityDocument(rawType,rawNumber);
+        return new IdentityDocument(type,number);
 
     }
 

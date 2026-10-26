@@ -64,7 +64,7 @@ public class MasterCustomerUseCase {
                         .orElse(incoming);
                 customerRepository.save(golden);
                 return rawRecordRepository.save(normalized.toBuilder()
-                        .status(RecordStatus.NORMALIZED)
+                        .status(RecordStatus.MASTERED)
                         .build());
             });
         } catch (RuntimeException e) {
