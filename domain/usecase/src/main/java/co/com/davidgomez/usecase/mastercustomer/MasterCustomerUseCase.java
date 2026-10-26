@@ -6,11 +6,14 @@ import co.com.davidgomez.model.customer.RawCustomerRecord;
 import co.com.davidgomez.model.customer.RecordStatus;
 import co.com.davidgomez.model.customer.gateways.CustomerRepository;
 import co.com.davidgomez.model.customer.gateways.RawCustomerRecordRepository;
+import co.com.davidgomez.model.customer.gateways.TransactionGateway;
 import lombok.RequiredArgsConstructor;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.attribute.UserDefinedFileAttributeView;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
@@ -22,6 +25,7 @@ public class MasterCustomerUseCase {
 
     private final CustomerRepository customerRepository;
     private final RawCustomerRecordRepository rawRecordRepository;
+    private final TransactionGateway transactionGateway;
 
     public Optional<RawCustomerRecord> receive(RawCustomerRecord incoming) {
         String hash = calculateHash(incoming);
@@ -44,10 +48,7 @@ public class MasterCustomerUseCase {
         try {
             document = IdentityDocument.of(record.getRawDocumentType(), record.getRawDocumentNumber());
         } catch (IllegalArgumentException e) {
-            return rawRecordRepository.save(record.toBuilder()
-                    .status(RecordStatus.ERROR)
-                    .errorMessage(e.getMessage())
-                    .build());
+            return markAsError(record, e.getMessage());
         }
 
         RawCustomerRecord normalized = rawRecordRepository.save(record.toBuilder()
@@ -55,17 +56,20 @@ public class MasterCustomerUseCase {
                 .errorMessage(null)
                 .build());
 
-        Customer incoming = toCustomer(normalized, document);
-
-        Customer golden = customerRepository.findByDocument(document)
-                .map(existing -> merge(existing, incoming))
-                .orElse(incoming);
-
-        customerRepository.save(golden);
-
-        return rawRecordRepository.save(normalized.toBuilder()
-                .status(RecordStatus.MASTERED)
-                .build());
+        try {
+            return transactionGateway.executeTransaction(() -> {
+                Customer incoming = toCustomer(normalized, document);
+                Customer golden = customerRepository.findByDocument(document)
+                        .map(existing -> merge(existing, incoming))
+                        .orElse(incoming);
+                customerRepository.save(golden);
+                return rawRecordRepository.save(normalized.toBuilder()
+                        .status(RecordStatus.NORMALIZED)
+                        .build());
+            });
+        } catch (RuntimeException e) {
+            return markAsError(normalized, "Error tecnico: " + e.getMessage());
+        }
 
     }
 
@@ -139,5 +143,19 @@ public class MasterCustomerUseCase {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
         }
+    }
+
+    public List<RawCustomerRecord> reprocessStuck(Duration maxAge) {
+        LocalDateTime threshold = LocalDateTime.now().minus(maxAge);
+        return rawRecordRepository.findStuck(RecordStatus.NORMALIZED, threshold).stream()
+                .map(this::process)
+                .toList();
+    }
+
+    private RawCustomerRecord markAsError(RawCustomerRecord record, String message) {
+        return rawRecordRepository.save(record.toBuilder()
+                .status(RecordStatus.ERROR)
+                .errorMessage(message)
+                .build());
     }
 }

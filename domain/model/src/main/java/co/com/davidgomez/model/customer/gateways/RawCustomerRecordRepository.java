@@ -3,6 +3,7 @@ package co.com.davidgomez.model.customer.gateways;
 import co.com.davidgomez.model.customer.RawCustomerRecord;
 import co.com.davidgomez.model.customer.RecordStatus;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface RawCustomerRecordRepository {
@@ -12,4 +13,6 @@ public interface RawCustomerRecordRepository {
     boolean existsByHash(String hash);
 
     List<RawCustomerRecord> findByStatus(RecordStatus status);
+
+    List<RawCustomerRecord> findStuck(RecordStatus status, LocalDateTime updateBefore);
 }
